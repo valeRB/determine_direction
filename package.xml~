@@ -1,0 +1,20 @@
+
+<package>
+<name>transform_ft</name>
+<version>0.6.1</version>
+<description>The transform_ft package</description>
+<maintainer email="vrb@kth.se">Valeria Reynaga</maintainer>
+<license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>rospy</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  
+  <run_depend>rospy</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>std_srvs</run_depend>
+
+
+</package>
