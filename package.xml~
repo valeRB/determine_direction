@@ -1,8 +1,8 @@
 
 <package>
-<name>transform_ft</name>
+<name>determine_direction</name>
 <version>0.6.1</version>
-<description>The transform_ft package</description>
+<description>The determine_direction package</description>
 <maintainer email="vrb@kth.se">Valeria Reynaga</maintainer>
 <license>BSD</license>
 
@@ -10,10 +10,12 @@
 
   <build_depend>rospy</build_depend>
   <build_depend>geometry_msgs</build_depend>
+  <build_depend>re_msgs</build_depend>
   <build_depend>std_srvs</build_depend>
   
   <run_depend>rospy</run_depend>
   <run_depend>geometry_msgs</run_depend>
+  <run_depend>re_msgs</run_depend>
   <run_depend>std_srvs</run_depend>
 
 

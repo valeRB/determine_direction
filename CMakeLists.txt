@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(determine_direction)
 
 ## Find catkin and any catkin packages
-find_package(catkin REQUIRED COMPONENTS rospy geometry_msgs std_srvs)
+find_package(catkin REQUIRED COMPONENTS rospy geometry_msgs  std_srvs)
 find_package(Boost REQUIRED system filesystem date_time thread)
 
 ## Generate added messages and services
@@ -11,7 +11,7 @@ find_package(Boost REQUIRED system filesystem date_time thread)
 ## Declare a catkin package
 catkin_package(
  CATKIN_DEPENDS 
- rospy geometry_msgs std_srvs
+ rospy geometry_msgs std_srvs 
 )
 
 
