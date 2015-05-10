@@ -21,14 +21,18 @@ def r_direction_callback(msg):
     R_wrench = msg
     br_r = tf.TransformBroadcaster()
     br_r.sendTransform((0, 0, 0),
-         tf.transformations.quaternion_from_euler(0.0, 3.14, -1.57),
+         tf.transformations.quaternion_from_euler(0.0, 1.57, 0.0),
          rospy.Time.now(),
          "ft_transform_r",
          "r_gripper_motor_accelerometer_link")
     N_force = m.sqrt((m.pow(R_wrench.wrench.force.x, 2) +
                m.pow(R_wrench.wrench.force.z, 2)))
-    theta = m.acos(R_wrench.wrench.force.x / N_force)
-##    rospy.loginfo("Fx: %f", R_wrench.wrench.force.x)
+##    theta = m.acos(R_wrench.wrench.force.x / N_force)
+    theta = m.atan2(R_wrench.wrench.force.z, R_wrench.wrench.force.x)
+    ## -- 0 deg= 0 rad; 90 = pi/2; 180 = pi; 270 = -pi/2
+    rospy.loginfo("Theta: %f", theta)
+##    print("45 deg", m.atan2(1,-1))
+##    print("225 deg", m.atan2(-1,1))
 ##    rospy.loginfo("Fz: %f", R_wrench.wrench.force.z)
 ##    rospy.loginfo("Check N_force: %f", N_force)
 ##    rospy.loginfo("Check theta: %f", theta)
