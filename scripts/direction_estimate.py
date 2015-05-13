@@ -11,12 +11,14 @@ import kalman as K
 import tf
 
 
-pub_r = rospy.Publisher("/direction/right_arm", PoseStamped)
+pub_r = rospy.Publisher("/direction/right_arm_estimate", PoseStamped)
+pub_r_t = rospy.Publisher("/direction/right_arm", PoseStamped)
 pub_l = rospy.Publisher("/direction/left_arm", PoseStamped)
 
 R_wrench = WrenchStamped()
 L_wrench = WrenchStamped()
 R_dir = PoseStamped()
+R_dir_t = PoseStamped()
 L_dir = PoseStamped()
 
 xhat_0 = np.matrix('1.57 ; 0.0') # start estimate at pi/2 for theta
@@ -28,9 +30,10 @@ THETA_hat = np.array([])
 mag_FORCE = np.array([])
 xhat = np.matrix('1.57 ; 0.0')
 P = np.matrix([])
+theta_euler = 0
 
 def r_direction_callback(msg):
-    global THETA, THETA_hat, first_estimate, xhat, P, THETA_2q, mag_FORCE
+    global THETA, THETA_hat, first_estimate, xhat, P, THETA_2q, mag_FORCE, theta_euler
     R_wrench = msg
     br_r = tf.TransformBroadcaster()
     br_r.sendTransform((0, 0, 0),
@@ -58,26 +61,38 @@ def r_direction_callback(msg):
     else:
         (xhat, P) = K.Kalman_Filter(theta_r_2q, xhat, P)
         THETA_hat = np.append(THETA_hat, xhat[0])
-        
     
     ## -- 0 deg= 0 rad; 90 = pi/2; 180 = pi; 270 = -pi/2
-##    if theta_r > 0: #transform to visualize direction towards +Z
-##        theta_r += m.pi
 ##    rospy.loginfo("Theta: %f", theta_r)
 ##    print("45 deg", m.atan2(1,-1))
 ##    print("225 deg", m.atan2(-1,1))
 ##    rospy.loginfo("Fz: %f", R_wrench.wrench.force.z)
 ##    rospy.loginfo("Check N_force: %f", N_force)
 ##    rospy.loginfo("Check theta: %f", theta_r)
-##    R_dir.header.frame_id = 'ft_transform_r'
-##    quat = tf.transformations.quaternion_from_euler(0.0, theta_r, 0.0)
-##      
-##    R_dir.pose.orientation.x = quat[0]
-##    R_dir.pose.orientation.y = quat[1]
-##    R_dir.pose.orientation.z = quat[2]
-##    R_dir.pose.orientation.w = quat[3]
-##    
-##    pub_r.publish(R_dir)    
+# ______ Publish Estimated Theta ______
+    R_dir.header.frame_id = 'ft_transform_r'    
+    theta_euler = float(xhat[0])
+    quat = tf.transformations.quaternion_from_euler(0.0, theta_euler, 0.0)
+    
+    R_dir.pose.orientation.x = quat[0]
+    R_dir.pose.orientation.y = quat[1]
+    R_dir.pose.orientation.z = quat[2]
+    R_dir.pose.orientation.w = quat[3]
+
+    pub_r.publish(R_dir)
+
+    # ______ Publish Actual Theta ______
+    R_dir_t.header.frame_id = 'ft_transform_r'    
+    
+    quat = tf.transformations.quaternion_from_euler(0.0, theta_r, 0.0)
+    
+    R_dir_t.pose.orientation.x = quat[0]
+    R_dir_t.pose.orientation.y = quat[1]
+    R_dir_t.pose.orientation.z = quat[2]
+    R_dir_t.pose.orientation.w = quat[3]
+
+    pub_r.publish(R_dir)
+    pub_r_t.publish(R_dir_t) 
     
     return
 
@@ -137,21 +152,40 @@ if __name__ == '__main__':
     print('len(THETA_2q)', len(THETA_2q))
     print('len(X_axis)',len(X_axis))
     figure("Theta and theta_hat")
-    subplot(411)
+    subplot(311)
     plot(X_axis, THETA, 'g'), title('THETA'), ylabel('[rad]')
-    subplot(412)
+    subplot(312)
     plot(X_axis, THETA_2q, 'b'), title('THETA_2q')
     plot(X_axis, THETA_hat, 'r'), title('THETA_hat')
     legend(('Theta_2q','THETA_hat'),'upper right')
-    subplot(413)
+    subplot(313)
     plot(X_axis, (THETA_2q - THETA_hat), 'r'), title("Error")
     
 ##    legend(('Theta','Theta_hat'),'upper right')
 ##
-    subplot(414)
+    figure("Analyzing magnitude of force")
+    subplot(311)
     plot(X_axis, mag_FORCE), title('magnitude of force' )
-    #subplot(212)
-    #plot(X_axis, (THETA - THETA_2q), 'r'), title("Error")
+
+    diff_F = np.diff(mag_FORCE)
+    delta = 50
+    diff_F_delta = np.array([])
+    multiplos_delta = len(mag_FORCE) - (len(mag_FORCE) % delta)
+    
+    for i in range(0, (multiplos_delta- 1 - delta)):        
+        dif_delta = mag_FORCE[i+delta] - mag_FORCE[i]
+        diff_F_delta = np.append(diff_F_delta, dif_delta)
+
+    if len(diff_F_delta) < len(X_axis):
+        for i in range(len(diff_F_delta),len(X_axis)):
+            diff_F_delta = np.append(diff_F_delta, 0)
+    
+    
+    subplot(312)
+    plot(X_axis, diff_F_delta), title('Differentiation of force' )
+
+    subplot(313)
+    plot(X_axis, THETA_hat, 'r'), title('THETA_hat')
     
     
     

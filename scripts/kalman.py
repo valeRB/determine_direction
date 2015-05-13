@@ -38,7 +38,7 @@ D = np.matrix(eye_m)
 G = np.matrix(eye_m)
 u = 0
 wStd = 0.1
-vStd = 10
+vStd = 100
 # Initialize kalman filter
 
 Q = np.matrix( ((m.pow(wStd,2),0),(0,m.pow(wStd,2))) )
