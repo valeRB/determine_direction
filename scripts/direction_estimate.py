@@ -21,58 +21,81 @@ R_dir = PoseStamped()
 R_dir_t = PoseStamped()
 L_dir = PoseStamped()
 
-xhat_0 = np.matrix('1.57 ; 0.0') # start estimate at pi/2 for theta
-P_0 = np.matrix(np.identity(2))
-first_estimate = 1
+#--- Arrays to store values
 THETA = np.array([])
 THETA_2q = np.array([])
 THETA_hat = np.array([])
 mag_FORCE = np.array([])
-xhat = np.matrix('1.57 ; 0.0')
-P = np.matrix([])
+KK_gain = np.array([])
+PP = np.array([])
+Fx = np.array([])
+Fy = np.array([])
+Fz = np.array([])
+
+#--- Kalman Filter initial values
+xhat_0 = 1.57 # start estimate at pi/2 for theta
+P_0 = 1
+first_estimate = 1
+xhat = 0
+P = 0
+K_gain = 0
 theta_euler = 0
 
 def r_direction_callback(msg):
-    global THETA, THETA_hat, first_estimate, xhat, P, THETA_2q, mag_FORCE, theta_euler
+    global first_estimate, xhat, P, theta_euler, K_gain
+    global THETA, THETA_hat, THETA_2q, PP, KK_gain, Fx, Fy, Fz, mag_FORCE
     R_wrench = msg
+    # --- Collect Fx, Fy and Fz to plot later --
+    Fx = np. append(Fx, R_wrench.wrench.force.x)
+    Fy = np. append(Fy, R_wrench.wrench.force.y)
+    Fz = np. append(Fz, R_wrench.wrench.force.z)
+    # -----------------------------------------
     br_r = tf.TransformBroadcaster()
     br_r.sendTransform((0, 0, 0),
          tf.transformations.quaternion_from_euler(0.0, 1.57, 0.0),
          rospy.Time.now(),
          "ft_transform_r",
          "r_gripper_motor_accelerometer_link")
+    
     N_force = m.sqrt((m.pow(R_wrench.wrench.force.x, 2) +
                m.pow(R_wrench.wrench.force.z, 2)))
     mag_FORCE = np.append(mag_FORCE, N_force)
 ##    theta = m.acos(R_wrench.wrench.force.x / N_force)
+    Fx_n = R_wrench.wrench.force.x/N_force
+    Fy_n = R_wrench.wrench.force.y/N_force
+    theta_n = m.acos(Fx_n)
     theta_r = m.atan2(R_wrench.wrench.force.z, R_wrench.wrench.force.x)
     if theta_r < 0:
         theta_r_2q = theta_r + m.pi
     else:
         theta_r_2q = theta_r
+##    print('Fx: ', R_wrench.wrench.force.x)
+##    print('Fy: ', R_wrench.wrench.force.z)
+##    print('Fx_n', Fx_n)
+##    print('N_force', N_force)
+##    print('theta_n = m.acos(Fx_n)', theta_n)
+##    print('theta_r = atan2...', theta_r)
+##    print('theta_r_2q', theta_r_2q)
     THETA = np.append(THETA, theta_r)
     THETA_2q = np.append(THETA_2q, theta_r_2q)
     if first_estimate == 1:
-        (xhat, P) = K.Kalman_Filter(theta_r_2q, xhat_0, P_0)
-        THETA_hat = np.append(THETA_hat, xhat[0])
+        (xhat, P, K_gain) = K.Kalman_Filter(theta_r_2q, xhat_0, P_0)
+        KK_gain = np.append(KK_gain, K_gain)
+        PP = np.append(PP, P)
+        THETA_hat = np.append(THETA_hat, xhat)
         first_estimate = 0
-        print ("xhat is: "  , xhat[0])
         
     else:
-        (xhat, P) = K.Kalman_Filter(theta_r_2q, xhat, P)
-        THETA_hat = np.append(THETA_hat, xhat[0])
+        (xhat, P, K_gain) = K.Kalman_Filter(theta_r_2q, xhat, P)
+        KK_gain = np.append(KK_gain, K_gain)
+        PP = np.append(PP, P)
+        THETA_hat = np.append(THETA_hat, xhat)
     
     ## -- 0 deg= 0 rad; 90 = pi/2; 180 = pi; 270 = -pi/2
-##    rospy.loginfo("Theta: %f", theta_r)
-##    print("45 deg", m.atan2(1,-1))
-##    print("225 deg", m.atan2(-1,1))
-##    rospy.loginfo("Fz: %f", R_wrench.wrench.force.z)
-##    rospy.loginfo("Check N_force: %f", N_force)
-##    rospy.loginfo("Check theta: %f", theta_r)
-# ______ Publish Estimated Theta ______
+
     R_dir.header.frame_id = 'ft_transform_r'    
-    theta_euler = float(xhat[0])
-    quat = tf.transformations.quaternion_from_euler(0.0, theta_euler, 0.0)
+    theta_euler = xhat
+    quat = tf.transformations.quaternion_from_euler(0.0, -theta_euler, 0.0)
     
     R_dir.pose.orientation.x = quat[0]
     R_dir.pose.orientation.y = quat[1]
@@ -84,7 +107,7 @@ def r_direction_callback(msg):
     # ______ Publish Actual Theta ______
     R_dir_t.header.frame_id = 'ft_transform_r'    
     
-    quat = tf.transformations.quaternion_from_euler(0.0, theta_r, 0.0)
+    quat = tf.transformations.quaternion_from_euler(0.0, -theta_r, 0.0)
     
     R_dir_t.pose.orientation.x = quat[0]
     R_dir_t.pose.orientation.y = quat[1]
@@ -122,8 +145,6 @@ def l_direction_callback(msg):
     return
 
 
-
-
 def direction_estimate():
     rospy.init_node('direction_estimate', anonymous=True)
     rospy.Subscriber("/ft_transformed/rig_arm", WrenchStamped, r_direction_callback)
@@ -147,45 +168,49 @@ if __name__ == '__main__':
         pass
     raw_input("Press any key to see plot of theta")
     X_axis = np.linspace(0,(len(THETA)-1),len(THETA))
-    print('len(THETA)', len(THETA))
-##    print('len(THETA_hat)', len(THETA_hat))
-    print('len(THETA_2q)', len(THETA_2q))
+    print('len(THETA_hat)', len(THETA_hat))
     print('len(X_axis)',len(X_axis))
     figure("Theta and theta_hat")
     subplot(311)
-    plot(X_axis, THETA, 'g'), title('THETA'), ylabel('[rad]')
+    #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
+    plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
+    plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+    legend(('THETA_2q', 'Estimated THETA'),'upper right')
     subplot(312)
-    plot(X_axis, THETA_2q, 'b'), title('THETA_2q')
-    plot(X_axis, THETA_hat, 'r'), title('THETA_hat')
-    legend(('Theta_2q','THETA_hat'),'upper right')
+    plot(X_axis, Fx, 'r'), title('Fx'), ylabel('[N]')
     subplot(313)
-    plot(X_axis, (THETA_2q - THETA_hat), 'r'), title("Error")
-    
-##    legend(('Theta','Theta_hat'),'upper right')
+    plot(X_axis, Fz, 'b'), title('Fz'), ylabel('[N]')
+
+##    plot(X_axis, mag_FORCE, 'r'), title("Magnitude of Force")
+
+    figure("Kalman Filter")
+    subplot(211)
+    plot(X_axis, KK_gain),title("Kalman Gain for theta")
+    subplot(212)
+    plot(X_axis, np.sqrt(PP)),title("Covariance for theta")
+
+##    
+##    figure("Analyzing magnitude of force")
+##    subplot(311)
+##    plot(X_axis, mag_FORCE), title('magnitude of force' )
 ##
-    figure("Analyzing magnitude of force")
-    subplot(311)
-    plot(X_axis, mag_FORCE), title('magnitude of force' )
-
-    diff_F = np.diff(mag_FORCE)
-    delta = 50
-    diff_F_delta = np.array([])
-    multiplos_delta = len(mag_FORCE) - (len(mag_FORCE) % delta)
-    
-    for i in range(0, (multiplos_delta- 1 - delta)):        
-        dif_delta = mag_FORCE[i+delta] - mag_FORCE[i]
-        diff_F_delta = np.append(diff_F_delta, dif_delta)
-
-    if len(diff_F_delta) < len(X_axis):
-        for i in range(len(diff_F_delta),len(X_axis)):
-            diff_F_delta = np.append(diff_F_delta, 0)
-    
-    
-    subplot(312)
-    plot(X_axis, diff_F_delta), title('Differentiation of force' )
-
-    subplot(313)
-    plot(X_axis, THETA_hat, 'r'), title('THETA_hat')
+##    diff_F = np.diff(mag_FORCE)
+##    delta = 50
+##    diff_F_delta = np.array([])
+##    multiplos_delta = len(mag_FORCE) - (len(mag_FORCE) % delta)
+##    
+##    for i in range(0, (multiplos_delta- 1 - delta)):        
+##        dif_delta = mag_FORCE[i+delta] - mag_FORCE[i]
+##        diff_F_delta = np.append(diff_F_delta, dif_delta)
+##
+##    if len(diff_F_delta) < len(X_axis):
+##        for i in range(len(diff_F_delta),len(X_axis)):
+##            diff_F_delta = np.append(diff_F_delta, 0)    
+##    subplot(312)
+##    plot(X_axis, diff_F_delta), title('Differentiation of force' )
+##
+##    subplot(313)
+##    plot(X_axis, THETA_hat, 'r'), title('THETA_hat')
     
     
     
