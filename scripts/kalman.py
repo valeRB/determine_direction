@@ -45,23 +45,19 @@ import numpy as np
 dt = 0.001
 A = 1
 
-wStd = 0.1
-vStd = 10
-# Initialize kalman filter
+wStd = 0.1 # Process noise
+vStd = 50 # Measurement noise
+
 Q = m.pow(wStd,2)
 R = m.pow(vStd,2)
 
 def Kalman_Filter(m_theta, xhat_1, P_1):
     z = m_theta
-##    print(z)
-    # Prediction: 
-##    raw_input("PT 2: PREDICTION")
+    # Prediction:
     xhat = A * xhat_1 
     P = P_1 + Q
-##    print('xhat: ', xhat)
-##    print('P: ', P)
 
-    # Measurment Update:
+    # Measurement Update:
     K = P/(P + R)
     xhat = xhat + K * (z - xhat)
     P = (1 - K) * P
