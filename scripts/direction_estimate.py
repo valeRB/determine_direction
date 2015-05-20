@@ -15,6 +15,7 @@ pub_r = rospy.Publisher("/direction/right_arm_estimate", PoseStamped)
 pub_r_t = rospy.Publisher("/direction/right_arm", PoseStamped)
 pub_l = rospy.Publisher("/direction/left_arm", PoseStamped)
 pub_theta_hat = rospy.Publisher("/theta_estimate", Float32)
+pub_mag_force = rospy.Publisher("/mag_force", Float32)
 
 R_wrench = WrenchStamped()
 L_wrench = WrenchStamped()
@@ -22,6 +23,7 @@ R_dir = PoseStamped()
 R_dir_t = PoseStamped()
 L_dir = PoseStamped()
 theta_pub = Float32()
+mag_force = Float32()
 
 #--- Arrays to store values
 THETA = np.array([])
@@ -33,6 +35,10 @@ PP = np.array([])
 Fx = np.array([])
 Fy = np.array([])
 Fz = np.array([])
+Tx = np.array([])
+Ty = np.array([])
+Tz = np.array([])
+
 
 #--- Kalman Filter initial values
 xhat_0 = 1.57 # start estimate at pi/2 for theta
@@ -47,12 +53,18 @@ print_once = 0
 
 def r_direction_callback(msg):
     global first_estimate, xhat, P, theta_euler, K_gain, estimation_started, print_once
-    global THETA, THETA_hat, THETA_2q, PP, KK_gain, Fx, Fy, Fz, mag_FORCE
+    global THETA, THETA_hat, THETA_2q, PP, KK_gain, Fx, Fy, Fz, Tx, Ty, Tz, mag_FORCE
     R_wrench = msg
     # --- Collect Fx, Fy and Fz to plot later --
     Fx = np. append(Fx, R_wrench.wrench.force.x)
     Fy = np. append(Fy, R_wrench.wrench.force.y)
     Fz = np. append(Fz, R_wrench.wrench.force.z)
+    Tx = np. append(Tx, R_wrench.wrench.torque.x)
+    Ty = np. append(Ty, R_wrench.wrench.torque.y)
+    Tz = np. append(Tz, R_wrench.wrench.torque.z)
+
+    N_force = m.sqrt((m.pow(R_wrench.wrench.force.x, 2) + m.pow(R_wrench.wrench.force.z, 2)))
+    mag_FORCE = np.append(mag_FORCE, N_force)
     # -----------------------------------------
 
     # --- Create new frame for publishing theta -----
@@ -63,13 +75,13 @@ def r_direction_callback(msg):
          "ft_transform_r",
          "r_gripper_motor_accelerometer_link")
     # ----------------------------------------------
-    N_force = m.sqrt((m.pow(R_wrench.wrench.force.x, 2) + m.pow(R_wrench.wrench.force.z, 2)))
-    if abs(R_wrench.wrench.force.z) > 0.5 or estimation_started == 1:
+    
+    if abs(R_wrench.wrench.torque.x) > 0.2 or estimation_started == 1:
         if estimation_started == 0:
             print("Someone started to hold the object!")
         estimation_started = 1
 
-        # mag_FORCE = np.append(mag_FORCE, N_force)
+        
         #theta = m.acos(R_wrench.wrench.force.x / N_force)
         # Fx_n = R_wrench.wrench.force.x/N_force
         # Fy_n = R_wrench.wrench.force.y/N_force
@@ -85,20 +97,19 @@ def r_direction_callback(msg):
         # --- Theta_hat estimation with Kalman Filter ---
         if first_estimate == 1:
             (xhat, P, K_gain) = K.Kalman_Filter(theta_r_2q, xhat_0, P_0)
-            KK_gain = np.append(KK_gain, K_gain)
-            PP = np.append(PP, P)
-            THETA_hat = np.append(THETA_hat, xhat)
             first_estimate = 0
             
         else:
             (xhat, P, K_gain) = K.Kalman_Filter(theta_r_2q, xhat, P)
-            KK_gain = np.append(KK_gain, K_gain)
-            PP = np.append(PP, P)
-            THETA_hat = np.append(THETA_hat, xhat)
 
-        # --- Publish Theta for change_detection node ---
+        KK_gain = np.append(KK_gain, K_gain)
+        PP = np.append(PP, P)
+        THETA_hat = np.append(THETA_hat, xhat)
+        # --- Publish Theta, mag_force for change_detection node ---
         theta_pub = xhat
+        mag_force = N_force
         pub_theta_hat.publish(theta_pub)
+        pub_mag_force.publish(mag_force)
         # ----------------------------------------------
 
         # --- Publish Theta from Force Measurements ---
@@ -191,18 +202,32 @@ if __name__ == '__main__':
     plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
     legend(('THETA_2q', 'Estimated THETA'),'upper right')
 
-    figure(2)
-    subplot(311)
-    #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
-    plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
-    plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
-    legend(('THETA_2q', 'Estimated THETA'),'upper right')
-    
-    subplot(312)
-    plot(X_axis_F, Fx, 'r'), title('Fx'), ylabel('[N]')
-    subplot(313)
-    plot(X_axis_F, Fz, 'b'), title('Fz'), ylabel('[N]')
+    # figure(2)
+    # #subplot(211)
+    # #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
+    # plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
+    # plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+    # legend(('THETA_2q', 'Estimated THETA'),'upper right')
 
+    figure(3)    
+    subplot(411)
+    plot(X_axis_F, Fx, 'r'), title('Fx'), ylabel('[N]')
+    subplot(412)
+    plot(X_axis_F, Fy, 'g'), title('Fy'), ylabel('[N]')
+    subplot(413)
+    plot(X_axis_F, Fz, 'b'), title('Fz'), ylabel('[N]')
+    subplot(414)
+    plot(X_axis_F, mag_FORCE, 'b'), title('mag_FORCE'), ylabel('[N]')
+
+    figure(4)    
+    subplot(311)
+    plot(X_axis_F, Tx, 'r'), title('Tx'), ylabel('[Nm]')
+    subplot(312)
+    plot(X_axis_F, Ty, 'g'), title('Ty'), ylabel('[Nm]')
+    subplot(313)
+    plot(X_axis_F, Tz, 'b'), title('Tz'), ylabel('[Nm]')
+
+    plot
 ##    plot(X_axis, mag_FORCE, 'r'), title("Magnitude of Force")
 
     # figure("Kalman Filter")
