@@ -32,7 +32,7 @@ time_force_changed = 0
 
 # --- Tunable parameters
 thresh_d_force = 1
-thresh_d_theta = 0.12 
+thresh_d_theta = 0.12
 
 def r_pose_callback(msg):
 	global	theta_hat, theta_hat_A

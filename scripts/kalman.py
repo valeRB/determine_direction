@@ -46,7 +46,7 @@ dt = 0.001
 A = 1
 
 wStd = 0.1 # Process noise
-vStd = 50 # Measurement noise
+vStd = 20 # Measurement noise
 
 Q = m.pow(wStd,2)
 R = m.pow(vStd,2)
