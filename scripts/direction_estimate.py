@@ -24,6 +24,7 @@ R_dir_t = PoseStamped()
 L_dir = PoseStamped()
 theta_pub = Float32()
 mag_force = Float32()
+save_arrays = True
 
 #--- Arrays to store values
 THETA = np.array([])
@@ -55,16 +56,17 @@ def r_direction_callback(msg):
     global first_estimate, xhat, P, theta_euler, K_gain, estimation_started, print_once
     global THETA, THETA_hat, THETA_2q, PP, KK_gain, Fx, Fy, Fz, Tx, Ty, Tz, mag_FORCE
     R_wrench = msg
-    # --- Collect Fx, Fy and Fz to plot later --
-    Fx = np. append(Fx, R_wrench.wrench.force.x)
-    Fy = np. append(Fy, R_wrench.wrench.force.y)
-    Fz = np. append(Fz, R_wrench.wrench.force.z)
-    Tx = np. append(Tx, R_wrench.wrench.torque.x)
-    Ty = np. append(Ty, R_wrench.wrench.torque.y)
-    Tz = np. append(Tz, R_wrench.wrench.torque.z)
-
     N_force = m.sqrt((m.pow(R_wrench.wrench.force.x, 2) + m.pow(R_wrench.wrench.force.z, 2)))
-    mag_FORCE = np.append(mag_FORCE, N_force)
+    
+    if save_arrays == True:
+        # --- Collect Fx, Fy and Fz to plot later --
+        Fx = np.append(Fx, R_wrench.wrench.force.x)
+        Fy = np.append(Fy, R_wrench.wrench.force.y)
+        Fz = np.append(Fz, R_wrench.wrench.force.z)
+        Tx = np.append(Tx, R_wrench.wrench.torque.x)
+        Ty = np.append(Ty, R_wrench.wrench.torque.y)
+        Tz = np.append(Tz, R_wrench.wrench.torque.z)        
+        mag_FORCE = np.append(mag_FORCE, N_force)
     # -----------------------------------------
 
     # --- Create new frame for publishing theta -----
@@ -91,8 +93,9 @@ def r_direction_callback(msg):
             theta_r_2q = theta_r + m.pi
         else:
             theta_r_2q = theta_r
-        THETA = np.append(THETA, theta_r)
-        THETA_2q = np.append(THETA_2q, theta_r_2q)
+        if save_arrays == True:
+            THETA = np.append(THETA, theta_r)
+            THETA_2q = np.append(THETA_2q, theta_r_2q)
 
         # --- Theta_hat estimation with Kalman Filter ---
         if first_estimate == 1:
@@ -101,10 +104,10 @@ def r_direction_callback(msg):
             
         else:
             (xhat, P, K_gain) = K.Kalman_Filter(theta_r_2q, xhat, P)
-
-        KK_gain = np.append(KK_gain, K_gain)
-        PP = np.append(PP, P)
-        THETA_hat = np.append(THETA_hat, xhat)
+        if save_arrays == True:
+            KK_gain = np.append(KK_gain, K_gain)
+            PP = np.append(PP, P)
+            THETA_hat = np.append(THETA_hat, xhat)
         # --- Publish Theta, mag_force for change_detection node ---
         theta_pub = xhat
         mag_force = N_force
@@ -191,50 +194,65 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         pass
-    raw_input("Press any key to see plot of theta")
-    X_axis = np.linspace(0,(len(THETA)-1),len(THETA))
-    X_axis_F = np.linspace(0,(len(Fx)-1),len(Fx))
-    print('len(X_axis)',len(X_axis))
-    print('len(X_axis_F)',len(X_axis_F))
-    
-    figure(1)
-    plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
-    plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
-    legend(('THETA_2q', 'Estimated THETA'),'upper right')
+    if save_arrays == True:
+        raw_input("Press any key to see plot of theta")
+        X_axis = np.linspace(0,(len(THETA)-1),len(THETA))
+        X_axis_F = np.linspace(0,(len(Fx)-1),len(Fx))
+        print('len(X_axis)',len(X_axis))
+        print('len(X_axis_F)',len(X_axis_F))
+        freq = 1000
+        # Create the ground truth vectors for plotting
+        gnd_truth = np.ones(len(X_axis))
+        gnd_truth[0:10001] = m.pi/2
+        gnd_truth[10001:20001] = m.pi/2 + m.pi/4
+        #angle1 = np.ones(10*freq) * m.pi/2
+        #gnd_truth = np.append(gnd_truth, angle1)
+        #angle2 = np.ones(10*freq) * m.pi/4
 
-    # figure(2)
-    # #subplot(211)
-    # #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
-    # plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
-    # plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
-    # legend(('THETA_2q', 'Estimated THETA'),'upper right')
 
-    figure(3)    
-    subplot(411)
-    plot(X_axis_F, Fx, 'r'), title('Fx'), ylabel('[N]')
-    subplot(412)
-    plot(X_axis_F, Fy, 'g'), title('Fy'), ylabel('[N]')
-    subplot(413)
-    plot(X_axis_F, Fz, 'b'), title('Fz'), ylabel('[N]')
-    subplot(414)
-    plot(X_axis_F, mag_FORCE, 'b'), title('mag_FORCE'), ylabel('[N]')
+        
+        figure(1)
+        subplot(211)
+        plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
+        plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+        legend(('THETA_2q', 'Estimated THETA'),'upper right')
+        subplot(212)
+        plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+        plot(X_axis, gnd_truth, '--k'), title('Real theta'), ylabel('[rad]')
+        legend(('Estimated THETA', 'Ground truth'),'upper right')
+        # figure(2)
+        # #subplot(211)
+        # #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
+        # plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
+        # plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+        # legend(('THETA_2q', 'Estimated THETA'),'upper right')
 
-    figure(4)    
-    subplot(311)
-    plot(X_axis_F, Tx, 'r'), title('Tx'), ylabel('[Nm]')
-    subplot(312)
-    plot(X_axis_F, Ty, 'g'), title('Ty'), ylabel('[Nm]')
-    subplot(313)
-    plot(X_axis_F, Tz, 'b'), title('Tz'), ylabel('[Nm]')
+        figure(3)    
+        subplot(411)
+        plot(X_axis_F, Fx, 'r'), title('Fx'), ylabel('[N]')
+        subplot(412)
+        plot(X_axis_F, Fy, 'g'), title('Fy'), ylabel('[N]')
+        subplot(413)
+        plot(X_axis_F, Fz, 'b'), title('Fz'), ylabel('[N]')
+        subplot(414)
+        plot(X_axis_F, mag_FORCE, 'b'), title('mag_FORCE'), ylabel('[N]')
 
-    plot
-##    plot(X_axis, mag_FORCE, 'r'), title("Magnitude of Force")
+        figure(4)    
+        subplot(311)
+        plot(X_axis_F, Tx, 'r'), title('Tx'), ylabel('[Nm]')
+        subplot(312)
+        plot(X_axis_F, Ty, 'g'), title('Ty'), ylabel('[Nm]')
+        subplot(313)
+        plot(X_axis_F, Tz, 'b'), title('Tz'), ylabel('[Nm]')
 
-    # figure("Kalman Filter")
-    # subplot(211)
-    # plot(X_axis, KK_gain),title("Kalman Gain for theta")
-    # subplot(212)
-    # plot(X_axis, np.sqrt(PP)),title("Covariance for theta")
-    
-    show()
+        plot
+    ##    plot(X_axis, mag_FORCE, 'r'), title("Magnitude of Force")
+
+        # figure("Kalman Filter")
+        # subplot(211)
+        # plot(X_axis, KK_gain),title("Kalman Gain for theta")
+        # subplot(212)
+        # plot(X_axis, np.sqrt(PP)),title("Covariance for theta")
+        
+        show()
 

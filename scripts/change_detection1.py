@@ -32,7 +32,7 @@ time_force_changed = 0
 
 # --- Tunable parameters
 thresh_d_force = 1
-thresh_d_theta = 0.12
+thresh_d_theta = 0.2
 
 def r_pose_callback(msg):
 	global	theta_hat, theta_hat_A
@@ -48,25 +48,26 @@ def r_force_callback(msg):
 	if save_arrays == True:
 		mag_force_A = np.append(mag_force_A, mag_force.data)
 	if first_time_force == True:
+		print("Estimation has started to publish")
 		prev_force = mag_force.data
 		theta_prev = theta_hat.data
-		timer = rospy.Timer(rospy.Duration(0.2), delta_F_callback)
+		timer = rospy.Timer(rospy.Duration(0.5), delta_F_callback)
 		first_time_force = False
 	if force_changed == True:
 		now = rospy.Time.now()
 		dT = now.to_sec() - time_force_changed
-		if dT >= 2:
-			print('2 secs passed')
+		if dT >= 1:
+			#print('2 secs passed')
 			d_theta = theta_hat.data - prev_theta
 			print('prev_theta', prev_theta)
 			print('current_theta ', theta_hat.data)
-			print('d_theta = ',d_theta)
+			print('d_theta = %f \n' % d_theta)
 			if abs(d_theta) > thresh_d_theta:
 				direction = check_direction_theta(d_theta)
 				if save_arrays == True:
 					change_A = np.append(change_A, direction * abs(d_theta))
 			else:
-				print('d_theta did not exceed threshold')
+				print('d_theta did not exceed threshold ')
 				if save_arrays == True:
 					change_A = np.insert(change_A, len(change_A), 0.0)
 			force_changed = False
@@ -96,7 +97,10 @@ def delta_F_callback(event):
 	prev_force = mag_force.data
 
 	if abs(d_force) > thresh_d_force and force_changed == False:
-		print("delta force is bigger than threshold at sample: ", len(mag_force_A))
+		if save_arrays == True:
+			print("delta force is bigger than threshold at sample: ", len(mag_force_A))
+		else:
+			print('Change in delta force')
 		prev_theta = theta_prev
 		now = rospy.Time.now()
 		time_force_changed = now.to_sec()
@@ -115,6 +119,7 @@ def change_detection1():
     rospy.Subscriber("mag_force", Float32, r_force_callback)
     #timer_theta = rospy.Timer(rospy.Duration(2), delta_theta_callback, oneshot=True)
     #rospy.Timer(rospy.Duration(1), test_callback)
+    print('...Waiting for msgs to be published... \n')
     rospy.spin()
     return
 
@@ -129,8 +134,9 @@ if __name__ == '__main__':
 
 	except KeyboardInterrupt:
 		pass
-	raw_input("Press any key if you wish to see plots")
+	
 	if save_arrays == True:
+		raw_input("Press any key if you wish to see plots")
 		print('len(mag_force_A)', len(mag_force_A))
 		print('len(theta_hat)', len(theta_hat_A))
 		print('len(change_A)', len(change_A))
