@@ -202,31 +202,30 @@ if __name__ == '__main__':
         print('len(X_axis_F)',len(X_axis_F))
         freq = 1000
         # Create the ground truth vectors for plotting
-        # theta_r_corner = 2.1
-        # theta_l_corner = 1.038
-        # gnd_truth = np.ones(18662)
-        # gnd_truth[0:9331] = m.pi/2
-        # gnd_truth[9331:18662] = theta_r_corner
-        # x_gnd = X_axis[0:18662]
-        # gnd_truth[18662:30001] = theta_l_corner
-        # gnd_truth[30001:-1] = m.pi/2
+        gnd_truth = np.ones(len(X_axis))
+        gnd_truth[0:10001] = m.pi/2
+        gnd_truth[10001:20001] = m.pi/2 + m.pi/4
         #angle1 = np.ones(10*freq) * m.pi/2
         #gnd_truth = np.append(gnd_truth, angle1)
         #angle2 = np.ones(10*freq) * m.pi/4
+
+
         
-        
-        
-        # figure(1)
-        # plot(x_gnd, THETA_2q[0:18662], 'g'), title('THETA_2q'), ylabel('[rad]')
-        # plot(x_gnd, THETA_hat[0:18662], 'r'), title('THETA_hat'), ylabel('[rad]')        
-        # plot(x_gnd, gnd_truth, '--k'), title('Estimator of direction'), ylabel('[rad]')
-        # legend(('Direction from measurements','Result of Kalman Filter, vStd = 20', 'Ground truth'),'lower right')
-        
-        figure(2)
-        # #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
+        figure(1)
+        subplot(211)
         plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
         plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
         legend(('THETA_2q', 'Estimated THETA'),'upper right')
+        subplot(212)
+        plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+        plot(X_axis, gnd_truth, '--k'), title('Real theta'), ylabel('[rad]')
+        legend(('Estimated THETA', 'Ground truth'),'upper right')
+        # figure(2)
+        # #subplot(211)
+        # #plot(X_axis, THETA, 'b'), title('THETA'), ylabel('[rad]')
+        # plot(X_axis, THETA_2q, 'g'), title('THETA_2q'), ylabel('[rad]')
+        # plot(X_axis, THETA_hat, 'r'), title('THETA_hat'), ylabel('[rad]')
+        # legend(('THETA_2q', 'Estimated THETA'),'upper right')
 
         figure(3)    
         subplot(411)
@@ -246,7 +245,7 @@ if __name__ == '__main__':
         subplot(313)
         plot(X_axis_F, Tz, 'b'), title('Tz'), ylabel('[Nm]')
 
-        
+        plot
     ##    plot(X_axis, mag_FORCE, 'r'), title("Magnitude of Force")
 
         # figure("Kalman Filter")
