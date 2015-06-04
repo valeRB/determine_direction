@@ -8,8 +8,8 @@ import numpy as np
 import math as m
 import tf
 
-#first_time = True
-save_array = False
+
+save_array = True
 wrench = WrenchStamped()
 R_vect = PointStamped()
 true_point = PointStamped()
@@ -22,14 +22,14 @@ true_point.point.y = 0
 true_point.point.z = 0.64
 
 # --- Kalman Filter initialization ---
-wStd = 0.01
-wStd1 = 0.01
-vStd = 5
+wStd = 0.01 
+wStd1 = 0.01#0.01
+vStd = 50
 A = np.eye(6)
 A = np.mat(A)
 I = np.eye(6)
 I = np.mat(I)
-r_hat_k = np.matrix([[0], [0], [0], [0], [0], [0]])
+r_hat_k = np.matrix([[0], [0], [0], [0], [0], [0.5]])
 P_k = np.eye(6)
 P_k = np.mat(P_k)
 Q = np.eye(6)* (m.pow(wStd,2))
@@ -37,11 +37,11 @@ Q = np.mat(Q)
 Q[3,3] = m.pow(wStd1,2)
 Q[4,4] = m.pow(wStd1,2)
 Q[5,5] = m.pow(wStd1,2)
-R = np.eye(6)* (m.pow(vStd,2))
+R = np.eye(3)* (m.pow(vStd,2))
 R = np.mat(R)
-H = np.zeros((6,6))
+H = np.zeros((3,6))
 H = np.mat(H)
-z_k = np.zeros((6,1))
+z_k = np.zeros((3,1))
 
 # Array vectors
 r_hat_A = np.empty([3,0])
@@ -99,10 +99,14 @@ def wrench_callback(msg):
 def Kalman_filter(H, z_k):
 	global A, r_hat_k, P_k, Q, R, I
 	z_k = np.mat(z_k)
-	# print ('H', H)
+	# print ('r_hat_k', r_hat_k)
 	# print ('z_k', z_k)
+	# print ('H', H)
+	# print ('A', A)
 	# print ('Q', Q)
 	# print ('R', R)
+	# print ('P_k', P_k)
+	# print ('I', I)
 	# -------- Prediction Step --------
 	r_hat_k = A * r_hat_k # [6x1]
 	#print ('Pred r_hat_k', r_hat_k)
@@ -110,15 +114,17 @@ def Kalman_filter(H, z_k):
 	#print ('Pred P_K', P_k)
 	# -------- Update Step -----------
 	K_k = P_k * (H.transpose()) * np.linalg.inv( (H * P_k * (H.transpose()) ) + R ) # [3x3]; PH'(HPH'+R)-1; H'=-H
-	# print('K_k', K_k)
-	# print('H * r_hat_k', H * r_hat_k)
-	# print('z_k - H * r_hat_k', z_k - H * r_hat_k)
+	#print('K_k', K_k)
+	#print('K_k.shape', K_k.shape)
+	#print('H * r_hat_k', H * r_hat_k)
+	#print('z_k - H * r_hat_k', z_k - H * r_hat_k)
 	# print('K_k * ( z_k - H * r_hat_k )', K_k * ( z_k - H * r_hat_k ))
 	r_hat_k = r_hat_k + K_k * ( z_k - H * r_hat_k ) # [3x1]
 	#print("r_hat_k", r_hat_k)
-	P_k = (I - K_k * H) * P_k # [3x3]
-	
+	#P_k = (I - K_k * H) * P_k # [3x3]
+	#print('r_hat_k', r_hat_k)
 	return r_hat_k
+
 
 def point_estimation():
 	rospy.init_node('point_estimation', anonymous=True)
@@ -167,16 +173,17 @@ if __name__ == '__main__':
 
 		# ---- Ground truth creation ----
 		show_gnd_truth = True
-		start_pt = 0 #13100
-		X_value = 0 # [m]
+		start_pt = 0 #13000 
+		X_value = -0.365  # [m]
 		Z_value = 0.64 # [m]
 		gnd_X = np.zeros(len(X_axis))
 		gnd_Y = np.zeros(len(X_axis))
-		gnd_Z = np.zeros(len(X_axis))
+		#gnd_Z = np.zeros(len(X_axis))
+		gnd_Z = np.ones(len(X_axis))*0
 		gnd_X[start_pt:] = X_value
-		gnd_Z[start_pt:] = Z_value
+		gnd_Z[start_pt:] = Z_value#0.41
 		ymax = 0.9
-		ymin = -0.2
+		ymin = -0.4
 
 		
 
@@ -210,8 +217,15 @@ if __name__ == '__main__':
 			plot(X_axis, gnd_Z, '--k')
 			legend( ('Z_hat' , 'True Z'), 'lower right')
 			subplot(326), ylim((ymin, ymax))
-			plot(X_axis, np.squeeze(abs(r_z - gnd_Z)), 'b'), title('Estimation error for R_z')
+			plot(X_axis, np.squeeze(r_z - gnd_Z), 'b'), title('Estimation error for R_z')
 			plot(X_axis, gnd_Y, '--k')
 
 
+
+		# theta = np.arctan2(r_x,r_z)
+		# true_theta = np.ones(len(X_axis))*0.0
+
+		# figure(4)
+		# plot(X_axis, np.squeeze(theta)), title ("Direction estimate in X-Z plane"), ylabel('[rad]')
+		# plot(X_axis, true_theta, '--k')
 		show()
