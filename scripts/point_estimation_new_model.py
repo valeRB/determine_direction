@@ -8,7 +8,6 @@ import numpy as np
 import math as m
 import tf
 
-
 save_array = True
 wrench = WrenchStamped()
 R_vect = PointStamped()
@@ -22,46 +21,33 @@ true_point.point.y = 0
 true_point.point.z = 0.64
 
 # --- Kalman Filter initialization x = [Tx, Ty, Tz, rx, ry, rz]
-# wStd = 0.01 
-# wStd1 = 0.01#0.01
-# vStd = 25
-# A = np.eye(6)
-# A = np.mat(A)
-# I = np.eye(6)
-# I = np.mat(I)
-# r_hat_k = np.matrix([[0], [0], [0], [0], [0], [0.5]])
-# P_k = np.eye(6)
-# P_k = np.mat(P_k)
-# Q = np.eye(6)* (m.pow(wStd,2))
-# Q = np.mat(Q)
-# Q[3,3] = m.pow(wStd1,2)
-# Q[4,4] = m.pow(wStd1,2)
-# Q[5,5] = m.pow(wStd1,2)
-# R = np.eye(3)* (m.pow(vStd,2))
-# R = np.mat(R)
-# H = np.zeros((3,6))
-# H = np.mat(H)
-# z_k = np.zeros((3,1))
-
-# --- Kalman Filter Initialization x = [rx, ry, rz]
-wStd = 0.1 
-vStd = 0.001
-wStd_y = 0.001#0.01
-A = np.eye(3)
+wStd = 0.01 
+wStd1 = 0.01#0.01
+vStd = 25
+A = np.zeros((6,6))
 A = np.mat(A)
-I = np.eye(3)
+A[3,3] = 1
+A[4,4] = 1
+A[5,5] = 1
+I = np.eye(6)
 I = np.mat(I)
-r_hat_k = np.matrix([[0], [0], [0.5]])
-P_k = np.eye(3)
+r_hat_k = np.matrix([[0], [0], [0], [0], [0], [0.5]])
+P_k = np.eye(6)
 P_k = np.mat(P_k)
-Q = np.eye(3)* (m.pow(wStd,2))
+Q = np.eye(6)* (m.pow(wStd,2))
 Q = np.mat(Q)
-Q[1,1] = (m.pow(wStd_y,2))
+Q[3,3] = m.pow(wStd1,2)
+Q[4,4] = m.pow(wStd1,2)
+Q[5,5] = m.pow(wStd1,2)
 R = np.eye(3)* (m.pow(vStd,2))
 R = np.mat(R)
-H = np.zeros((3,3))
+H = np.zeros((3,6))
 H = np.mat(H)
+H[0,0] = 1
+H[1,1] = 1
+H[2,2] = 1
 z_k = np.zeros((3,1))
+
 
 # Array vectors
 r_hat_A = np.empty([3,0])
@@ -77,12 +63,12 @@ def wrench_callback(msg):
 	global wrench, Torque, H
 	global r_hat_A, Fx, Fy, Fz, Tx, Ty, Tz
 	wrench = msg
-	H[0,1] = wrench.wrench.force.z
-	H[0,2] = -wrench.wrench.force.y
-	H[1,0] = -wrench.wrench.force.z
-	H[1,2] = wrench.wrench.force.x
-	H[2,0] = wrench.wrench.force.y
-	H[2,1] = -wrench.wrench.force.x
+	A[0,4] = wrench.wrench.force.z
+	A[0,5] = -wrench.wrench.force.y
+	A[1,3] = -wrench.wrench.force.z
+	A[1,5] = wrench.wrench.force.x
+	A[2,3] = wrench.wrench.force.y
+	A[2,4] = -wrench.wrench.force.x
 	z_k[0] = wrench.wrench.torque.x
 	z_k[1] = wrench.wrench.torque.y
 	z_k[2] = wrench.wrench.torque.z
@@ -98,16 +84,16 @@ def wrench_callback(msg):
 		"r_gripper_motor_accelerometer_link")
 	# ----------------------------------------------
 	R_vect.header.frame_id = 'ft_transform_r'
-	R_vect.point.x = r_hat_k[0]
-	R_vect.point.y = r_hat_k[1]
-	R_vect.point.z = r_hat_k[2]
+	R_vect.point.x = r_hat_k[3]
+	R_vect.point.y = r_hat_k[4]
+	R_vect.point.z = r_hat_k[5]
 	pub_R.publish(R_vect)
 
 	true_point.header.frame_id = 'ft_transform_r'
 	pub_t.publish(true_point)
 	
 	if save_array == True:
-		r_hat_A = np.hstack((r_hat_A, r_hat_k[0:]))
+		r_hat_A = np.hstack((r_hat_A, r_hat_k[3:]))
 		Fx = np.append(Fx, wrench.wrench.force.x)
         Fy = np.append(Fy, wrench.wrench.force.y)
         Fz = np.append(Fz, wrench.wrench.force.z)
@@ -119,22 +105,22 @@ def wrench_callback(msg):
 def Kalman_filter(H, z_k):
 	global A, r_hat_k, P_k, Q, R, I
 	z_k = np.mat(z_k)
-	# print ('r_hat_k', r_hat_k)
-	# print ('z_k', z_k)
-	# print ('H', H)
-	# print ('A', A)
-	# print ('Q', Q)
-	# print ('R', R)
-	# print ('P_k', P_k)
-	# print ('I', I)
+	print ('r_hat_k', r_hat_k)
+	print ('z_k', z_k)
+	print ('H', H)
+	print ('A', A)
+	print ('Q', Q)
+	print ('R', R)
+	print ('P_k', P_k)
+	print ('I', I)
 	# -------- Prediction Step --------
 	r_hat_k = A * r_hat_k # [6x1]
 	#print ('Pred r_hat_k', r_hat_k)
 	P_k = P_k + Q # [3x3]; A * P_k * A' + Q; A = A' in this case
 	#print ('Pred P_K', P_k)
 	# -------- Update Step -----------
-	K_k = P_k * (H.transpose()) * np.linalg.inv( (H * P_k * (H.transpose()) ) + R ) # [3x3]; PH'(HPH'+R)-1; H'=-H
-	#print('K_k', K_k)
+	K_k = P_k * (H.transpose()) * np.linalg.inv( (H * P_k * (H.transpose()) ) + R ) # [3x3]; PH'(HPH'+R)-1; 
+	print('K_k', K_k)
 	#print('K_k.shape', K_k.shape)
 	#print('H * r_hat_k', H * r_hat_k)
 	#print('z_k - H * r_hat_k', z_k - H * r_hat_k)
@@ -142,7 +128,7 @@ def Kalman_filter(H, z_k):
 	r_hat_k = r_hat_k + K_k * ( z_k - H * r_hat_k ) # [3x1]
 	#print("r_hat_k", r_hat_k)
 	#P_k = (I - K_k * H) * P_k # [3x3]
-	#print('r_hat_k', r_hat_k)
+	print('r_hat_k', r_hat_k)
 	return r_hat_k
 
 
@@ -194,8 +180,8 @@ if __name__ == '__main__':
 		# ---- Ground truth creation ----
 		show_gnd_truth = True
 		start_pt = 0#13000 
-		X_value = 0.365  # [m]
-		Z_value = 0.64 # [m]
+		X_value = 0.0  # [m]
+		Z_value = 0.0 # [m]
 		gnd_X = np.zeros(len(X_axis))
 		gnd_Y = np.zeros(len(X_axis))
 		#gnd_Z = np.zeros(len(X_axis))
@@ -211,34 +197,34 @@ if __name__ == '__main__':
 		#print(r_y - gnd_X)
 		figure(3)
 		# ---- R_x ----
-		subplot(311), ylim((ymin, ymax)) #, subplots_adjust(left=0.08,bottom=0.06,right=0.93,top=0.92, wspace=0.20, hspace = 0.33)
+		subplot(321), ylim((ymin, ymax)) #, subplots_adjust(left=0.08,bottom=0.06,right=0.93,top=0.92, wspace=0.20, hspace = 0.33)
 		plot(X_axis , np.squeeze(r_x), 'r'), title('Estimate of R_x'), ylabel('[m]')
 		if show_gnd_truth == True:
 			plot(X_axis, gnd_X, '--k')
 			legend(('X_hat' , 'True X'), 'lower right')
-			# subplot(322), ylim((ymin, ymax))
-			# plot(X_axis, np.squeeze(abs(r_x - gnd_X)), 'r'), title('Estimation error for R_x')
-			# plot(X_axis, gnd_Y, '--k')
+			subplot(322), ylim((ymin, ymax))
+			plot(X_axis, np.squeeze(abs(r_x - gnd_X)), 'r'), title('Estimation error for R_x')
+			plot(X_axis, gnd_Y, '--k')
 		
 		# ---- R_y ----
-		subplot(312), ylim((ymin, ymax))
+		subplot(323), ylim((ymin, ymax))
 		plot(X_axis, np.squeeze(r_y), 'g'), title('Estimate of R_y'), ylabel('[m]')
 		if show_gnd_truth == True:
 			plot(X_axis, gnd_Y, '--k')
 			legend(('Y_hat' , 'True Y'), 'lower right')
-			# subplot(324), ylim((ymin, ymax))
-			# plot(X_axis, np.squeeze(abs(r_y - gnd_Y)), 'g'), title('Estimation error for R_y')
-			# plot(X_axis, gnd_Y, '--k')
+			subplot(324), ylim((ymin, ymax))
+			plot(X_axis, np.squeeze(abs(r_y - gnd_Y)), 'g'), title('Estimation error for R_y')
+			plot(X_axis, gnd_Y, '--k')
 		
 		# ---- R_y ----
-		subplot(313), ylim((ymin, ymax))
+		subplot(325), ylim((ymin, ymax))
 		plot(X_axis, np.squeeze(r_z), 'b'), title('Estimate of R_z'), ylabel('[m]')
 		if show_gnd_truth == True:
 			plot(X_axis, gnd_Z, '--k')
 			legend( ('Z_hat' , 'True Z'), 'lower right')
-			# subplot(326), ylim((ymin, ymax))
-			# plot(X_axis, np.squeeze(r_z - gnd_Z), 'b'), title('Estimation error for R_z')
-			# plot(X_axis, gnd_Y, '--k')
+			subplot(326), ylim((ymin, ymax))
+			plot(X_axis, np.squeeze(r_z - gnd_Z), 'b'), title('Estimation error for R_z')
+			plot(X_axis, gnd_Y, '--k')
 
 
 
