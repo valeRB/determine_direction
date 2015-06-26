@@ -4,16 +4,19 @@ import rospy
 from matplotlib.pyplot import *
 from geometry_msgs.msg import WrenchStamped
 from geometry_msgs.msg import PointStamped
+from std_msgs.msg import Float32
 import numpy as np
 import math as m
 import tf
 
 
 save_array = True
+msg_being_published = False
 wrench = WrenchStamped()
 R_vect = PointStamped()
 true_point = PointStamped()
 pub_R = rospy.Publisher("/KF/point_estimation", PointStamped)
+pub_theta = rospy.Publisher("/KF/theta", Float32)
 pub_t = rospy.Publisher("/KF/true_point", PointStamped)
 
 # --- True point ---
@@ -21,32 +24,10 @@ true_point.point.x = 0
 true_point.point.y = 0
 true_point.point.z = 0.64
 
-# --- Kalman Filter initialization x = [Tx, Ty, Tz, rx, ry, rz]
-# wStd = 0.01 
-# wStd1 = 0.01#0.01
-# vStd = 25
-# A = np.eye(6)
-# A = np.mat(A)
-# I = np.eye(6)
-# I = np.mat(I)
-# r_hat_k = np.matrix([[0], [0], [0], [0], [0], [0.5]])
-# P_k = np.eye(6)
-# P_k = np.mat(P_k)
-# Q = np.eye(6)* (m.pow(wStd,2))
-# Q = np.mat(Q)
-# Q[3,3] = m.pow(wStd1,2)
-# Q[4,4] = m.pow(wStd1,2)
-# Q[5,5] = m.pow(wStd1,2)
-# R = np.eye(3)* (m.pow(vStd,2))
-# R = np.mat(R)
-# H = np.zeros((3,6))
-# H = np.mat(H)
-# z_k = np.zeros((3,1))
-
 # --- Kalman Filter Initialization x = [rx, ry, rz]
-wStd = 0.1 
-vStd = 0.001
-wStd_y = 0.001#0.01
+wStd = 0.01 
+vStd = 50
+wStd_y = 0.001
 A = np.eye(3)
 A = np.mat(A)
 I = np.eye(3)
@@ -65,6 +46,7 @@ z_k = np.zeros((3,1))
 
 # Array vectors
 r_hat_A = np.empty([3,0])
+theta_A = np.array([])
 Fx = np.array([])
 Fy = np.array([])
 Fz = np.array([])
@@ -74,8 +56,9 @@ Tz = np.array([])
 
 
 def wrench_callback(msg):
-	global wrench, Torque, H
-	global r_hat_A, Fx, Fy, Fz, Tx, Ty, Tz
+	global wrench, Torque, H, msg_being_published
+	global r_hat_A, Fx, Fy, Fz, Tx, Ty, Tz, theta_A
+	msg_being_published = True
 	wrench = msg
 	H[0,1] = wrench.wrench.force.z
 	H[0,2] = -wrench.wrench.force.y
@@ -88,6 +71,7 @@ def wrench_callback(msg):
 	z_k[2] = wrench.wrench.torque.z
 
 	r_hat_k = Kalman_filter(H, z_k)
+	
 
 	# --- Create new frame for publishing theta -----
 	br_r = tf.TransformBroadcaster()
@@ -105,6 +89,7 @@ def wrench_callback(msg):
 
 	true_point.header.frame_id = 'ft_transform_r'
 	pub_t.publish(true_point)
+	
 	
 	if save_array == True:
 		r_hat_A = np.hstack((r_hat_A, r_hat_k[0:]))
@@ -145,10 +130,20 @@ def Kalman_filter(H, z_k):
 	#print('r_hat_k', r_hat_k)
 	return r_hat_k
 
+def publish_theta_callback(event):
+	global theta_A, theta_k, msg_being_published
+	if msg_being_published == True:
+		theta_k = m.atan2(r_hat_k[0], r_hat_k[2])
+		if save_array == True:
+			theta_A = np.append(theta_A, theta_k)
+		pub_theta.publish(theta_k)
+		msg_being_published = False
+	return
 
 def point_estimation():
 	rospy.init_node('point_estimation', anonymous=True)
 	rospy.Subscriber("/ft_transformed/rig_arm", WrenchStamped, wrench_callback)
+	rospy.Timer(rospy.Duration(0.1), publish_theta_callback)
 	rospy.spin()
 	return
 if __name__ == '__main__':
@@ -174,7 +169,9 @@ if __name__ == '__main__':
 		print('len(X_axis)',len(X_axis))
 		print("len(Fx)",len(Fx))
 
-
+		sampled_X_axis = np.linspace(0,(np.size(theta_A)-1),np.size(theta_A))
+		figure(0)
+		plot(sampled_X_axis, theta_A, 'g'), title('theta'), ylabel('[rad]')
 		# figure(1)
 		# subplot(311)
 		# plot(X_axis, Fx, 'r'), title('Fx'), ylabel('[N]')
@@ -194,8 +191,8 @@ if __name__ == '__main__':
 		# ---- Ground truth creation ----
 		show_gnd_truth = True
 		start_pt = 0#13000 
-		X_value = 0.365  # [m]
-		Z_value = 0.64 # [m]
+		X_value = 0.0  # [m]
+		Z_value = 0.0 # [m]
 		gnd_X = np.zeros(len(X_axis))
 		gnd_Y = np.zeros(len(X_axis))
 		#gnd_Z = np.zeros(len(X_axis))
@@ -215,7 +212,7 @@ if __name__ == '__main__':
 		plot(X_axis , np.squeeze(r_x), 'r'), title('Estimate of R_x'), ylabel('[m]')
 		if show_gnd_truth == True:
 			plot(X_axis, gnd_X, '--k')
-			legend(('X_hat' , 'True X'), 'lower right')
+			# legend(('X_hat' , 'True X'), 'lower right')
 			# subplot(322), ylim((ymin, ymax))
 			# plot(X_axis, np.squeeze(abs(r_x - gnd_X)), 'r'), title('Estimation error for R_x')
 			# plot(X_axis, gnd_Y, '--k')
@@ -225,7 +222,7 @@ if __name__ == '__main__':
 		plot(X_axis, np.squeeze(r_y), 'g'), title('Estimate of R_y'), ylabel('[m]')
 		if show_gnd_truth == True:
 			plot(X_axis, gnd_Y, '--k')
-			legend(('Y_hat' , 'True Y'), 'lower right')
+			# legend(('Y_hat' , 'True Y'), 'lower right')
 			# subplot(324), ylim((ymin, ymax))
 			# plot(X_axis, np.squeeze(abs(r_y - gnd_Y)), 'g'), title('Estimation error for R_y')
 			# plot(X_axis, gnd_Y, '--k')
@@ -235,7 +232,7 @@ if __name__ == '__main__':
 		plot(X_axis, np.squeeze(r_z), 'b'), title('Estimate of R_z'), ylabel('[m]')
 		if show_gnd_truth == True:
 			plot(X_axis, gnd_Z, '--k')
-			legend( ('Z_hat' , 'True Z'), 'lower right')
+			# legend( ('Z_hat' , 'True Z'), 'lower right')
 			# subplot(326), ylim((ymin, ymax))
 			# plot(X_axis, np.squeeze(r_z - gnd_Z), 'b'), title('Estimation error for R_z')
 			# plot(X_axis, gnd_Y, '--k')
