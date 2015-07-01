@@ -18,8 +18,10 @@ import tf
 train_hmm = False
 path_estimate = False
 print_once = True
+prev_size_dec_seq = 0
 train_observation_seq = np.array([])
 plot_sequence = np.array([])
+plot_path = np.array([])
 path = np.array([])
 decoding_seq = np.array([])
 theta_k = Float32()
@@ -91,12 +93,13 @@ def start_viterbi_srv(req):
 	return
 
 def stop_viterbi_srv(req):
-	global path_estimate, decoding_seq, path, plot_sequence
+	global path_estimate, decoding_seq, path, plot_sequence, plot_path
 	print("Stopped path estimation")
 	print("Path", path)
 	path_estimate = False
 	plot_sequence = np.copy(decoding_seq)
 	decoding_seq = np.delete(decoding_seq,np.s_[:],0)
+	plot_path = np.copy(path)
 	path = np.delete(path,np.s_[:],0)
 	print("Size(decoding_seq)", decoding_seq.size)
 	print("Size(path)", path.size)
@@ -112,8 +115,6 @@ def reset_train_seq_srv(req):
 
 def estimator_callback(msg):
 	global train_observation_seq, decoding_seq, theta_A, print_once, path
-	# To make theta positive, add a big positive number (+5)
-	# hmm algo doesn't converge with negative numbers
 	theta_k = msg.data 
 	theta_A = np.append(theta_A, theta_k)
 	if train_hmm == True:
@@ -129,9 +130,21 @@ def estimator_callback(msg):
 			print_once = False
 		decoding_seq = np.append(decoding_seq, theta_k)
 
-		path = HMM_model.decode(decoding_seq)
+		#path = HMM_model.decode(decoding_seq)
 		#print("Path: ", path)
 	return
+
+def compute_path(event):
+	global decoding_seq, prev_size_dec_seq, path_estimate, path
+	if path_estimate == True:
+		size_dec_seq = decoding_seq.size
+		#print("size_dec_seq", size_dec_seq)
+		if size_dec_seq > prev_size_dec_seq:
+			path = HMM_model.decode(decoding_seq)
+			#print("path", path)
+		prev_size_dec_seq = size_dec_seq
+		#print("prev_size_dec_seq", prev_size_dec_seq)
+
 
 def hmm_track_agents():
 	rospy.init_node('hmm_track_agents', anonymous=True)
@@ -142,6 +155,7 @@ def hmm_track_agents():
 	get_path = rospy.Service('get_path', Empty, start_viterbi_srv)
 	stop_path = rospy.Service('stop_path', Empty, stop_viterbi_srv)
 	get_path = rospy.Service('reset_training_seq', Empty, reset_train_seq_srv)
+	rospy.Timer(rospy.Duration(1), compute_path)
 	rospy.spin()
 	return
 
@@ -158,11 +172,11 @@ if __name__ == '__main__':
 		pass
 	raw_input("Press enter to plot theta or ctrl+Z if not")
 	sampled_X_axis = np.linspace(0,(np.size(plot_sequence)-1),np.size(plot_sequence))
-	print("Path: ", path)
-	print("np.size(path)", np.size(path))
-	X_path = np.linspace(0,(np.size(path)-1),np.size(path))
+	print("Path: ", plot_path)
+	#print("np.size(path)", np.size(path))
+	X_path = np.linspace(0,(np.size(plot_path)-1),np.size(plot_path))
 	figure(0)
 	plot(sampled_X_axis, plot_sequence, 'g'), title('theta'), ylabel('[rad]')
-	#figure(1)
-	# plot(X_path, path), title('Estimated Path'), ylabel('States')
+	figure(1)
+	plot(X_path, plot_path), title('Estimated Path'), ylabel('States')
 	show()
