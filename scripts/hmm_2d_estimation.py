@@ -18,7 +18,10 @@ import tf
 train_hmm = False
 path_estimate = False
 print_once = True
+r_point = PointStamped()
 prev_size_dec_seq = 0
+counter_sample = 0
+sample_size = 200
 train_observation_seq = np.array([])
 plot_sequence = np.array([])
 plot_path = np.array([])
@@ -27,13 +30,13 @@ decoding_seq = np.array([])
 theta_k = Float32()
 theta_A = np.array([])
 # ------- HMM Definition ----------
-N = 3
+N = 4
 M = 6
 D = 2
 print("---- HMM Initial parameters ----")
 pi = np.array([0.6, 0.2, 0.2])
 print("Initial pi: ", pi)
-A = np.array([[0.6, 0.3, 0.1] , [0.2, 0.6, 0.2], [0.1, 0.3, 0.6]])
+A = np.array([[0.6, 0.2, 0.2] , [0.2, 0.6, 0.2], [0.2, 0.2, 0.6]])
 print("Initial A: ", A)
 w = np.ones((N,M),dtype=np.double)*0.5
 print("w", w)
@@ -59,20 +62,20 @@ print("HMM node started... Call a service")
 HMM_model = GMHMM(N,M,D,A,means,covars,w,pi,init_type='user',verbose=True)
 
 
-def start_training_set_srv(req):
+def get_training_set_srv(req):
 	print("Start training requested")
 	print("Run a bag...")
 	global train_hmm
 	train_hmm = True
 	return
 
-def stop_training_set_srv(req):
+def start_training_srv(req):
 	global train_hmm
 	train_hmm = False
 	"Stopped collecting training data..."
 	if train_observation_seq.size:
 		print("   Training will begin with a sequence of length ", train_observation_seq.size)
-		HMM_model.train(train_observation_seq,100, epsilon=0.00001)	
+		HMM_model.train(train_observation_seq,10, epsilon=0.00001)	
 		print("Training is done:")
 		print("Pi: ", HMM_model.pi)
 		print("A: ", HMM_model.A)
@@ -114,21 +117,37 @@ def reset_train_seq_srv(req):
 
 
 def estimator_callback(msg):
-	global train_observation_seq, decoding_seq, theta_A, print_once, path
-	theta_k = msg.data 
-	theta_A = np.append(theta_A, theta_k)
+	global train_observation_seq, decoding_seq, theta_A, print_once, path, r_point, counter_sample
+	r_point = msg 
+	point_t = np.array([[r_point.point.x, r_point.point.z]])
+	#theta_A = np.append(theta_A, theta_k)
 	if train_hmm == True:
 		if print_once:
 			print("Creating observation sequence")
+			train_observation_seq = point_t
+			counter_sample += 1
+			#print(train_observation_seq)
 			print_once = False
-		
-		train_observation_seq = np.append(train_observation_seq, theta_k)
+		else:
+			if counter_sample == sample_size:
+				train_observation_seq = np.append(train_observation_seq, point_t, 0)
+				counter_sample = 1
+			else:
+				counter_sample += 1
+			#print("train_observation_seq", train_observation_seq)
 		#print("obs_seq:", train_observation_seq)
 	if path_estimate == True:
 		if print_once:
 			print("Estimating path")
+			decoding_seq = point_t
+			counter_sample = 1
 			print_once = False
-		decoding_seq = np.append(decoding_seq, theta_k)
+		else:
+			if counter_sample == sample_size:
+				decoding_seq = np.append(decoding_seq, point_t, 0)
+				counter_sample = 1
+			else:
+				counter_sample += 1
 
 		#path = HMM_model.decode(decoding_seq)
 		#print("Path: ", path)
@@ -148,10 +167,10 @@ def compute_path(event):
 
 def hmm_track_agents():
 	rospy.init_node('hmm_track_agents', anonymous=True)
-	rospy.Subscriber("/KF/theta", Float32, estimator_callback)
-	#pub_R = rospy.Subscriber("/KF/point_estimation", PointStamped, radius_callback)
-	start_set = rospy.Service('start_training_set', Empty, start_training_set_srv)
-	stop_set = rospy.Service('stop_training_set', Empty, stop_training_set_srv)
+	#rospy.Subscriber("/KF/theta", Float32, estimator_callback)
+	rospy.Subscriber("/KF/point_estimation", PointStamped, estimator_callback)
+	start_set = rospy.Service('get_training_set', Empty, get_training_set_srv)
+	stop_set = rospy.Service('start_training_set', Empty, start_training_srv)
 	get_path = rospy.Service('get_path', Empty, start_viterbi_srv)
 	stop_path = rospy.Service('stop_path', Empty, stop_viterbi_srv)
 	get_path = rospy.Service('reset_training_seq', Empty, reset_train_seq_srv)

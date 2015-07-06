@@ -26,7 +26,7 @@ true_point.point.z = 0.64
 
 # --- Kalman Filter Initialization x = [rx, ry, rz]
 wStd = 1
-vStd = 3000
+vStd = 2000
 wStd_y = 0.001
 A = np.eye(3)
 A = np.mat(A)
@@ -170,23 +170,23 @@ if __name__ == '__main__':
 		print("len(Fx)",len(Fx))
 
 		sampled_X_axis = np.linspace(0,(np.size(theta_A)-1),np.size(theta_A))
-		figure(0)
-		plot(sampled_X_axis, theta_A, 'g'), title('theta'), ylabel('[rad]')
-		figure(1)
-		subplot(311)
-		plot(X_axis, Fx, 'r'), title('Fx'), ylabel('[N]')
-		subplot(312)
-		plot(X_axis, Fy, 'g'), title('Fy'), ylabel('[N]')
-		subplot(313)
-		plot(X_axis, Fz, 'b'), title('Fz'), ylabel('[N]')
+		# figure(0)
+		# plot(sampled_X_axis, theta_A, 'g'), title('theta'), ylabel('[rad]')
+		# figure(1)
+		# subplot(311)
+		# plot(X_axis, Fx, 'r'), title('Fx'), ylabel('[N]')
+		# subplot(312)
+		# plot(X_axis, Fy, 'g'), title('Fy'), ylabel('[N]')
+		# subplot(313)
+		# plot(X_axis, Fz, 'b'), title('Fz'), ylabel('[N]')
 
-		figure(2)
-		subplot(311)
-		plot(X_axis, Tx, 'r'), title('Tx'), ylabel('[Nm]')
-		subplot(312)
-		plot(X_axis, Ty, 'g'), title('Ty'), ylabel('[Nm]')
-		subplot(313)
-		plot(X_axis, Tz, 'b'), title('Tz'), ylabel('[Nm]')
+		# figure(2)
+		# subplot(311)
+		# plot(X_axis, Tx, 'r'), title('Tx'), ylabel('[Nm]')
+		# subplot(312)
+		# plot(X_axis, Ty, 'g'), title('Ty'), ylabel('[Nm]')
+		# subplot(313)
+		# plot(X_axis, Tz, 'b'), title('Tz'), ylabel('[Nm]')
 
 		# ---- Ground truth creation ----
 		show_gnd_truth = True
