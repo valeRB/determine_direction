@@ -26,8 +26,8 @@ true_point.point.z = 0.64
 
 # --- Kalman Filter Initialization x = [rx, ry, rz]
 wStd = 1
-vStd = 2000
-wStd_y = 0.001
+vStd = 1000
+wStd_y = wStd
 A = np.eye(3)
 A = np.mat(A)
 I = np.eye(3)

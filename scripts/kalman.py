@@ -46,13 +46,13 @@ dt = 0.001
 A = 1
 
 wStd = 0.1 # Process noise
-vStd = 20 # Measurement noise
+vStd = 20#20 # Measurement noise
 
 Q = m.pow(wStd,2)
 R = m.pow(vStd,2)
 
-def Kalman_Filter(m_theta, xhat_1, P_1):
-    z = m_theta
+def Kalman_Filter(measurement, xhat_1, P_1):
+    z = measurement
     # Prediction:
     xhat = A * xhat_1 
     P = P_1 + Q
@@ -61,7 +61,7 @@ def Kalman_Filter(m_theta, xhat_1, P_1):
     K = P/(P + R)
     xhat = xhat + K * (z - xhat)
     P = (1 - K) * P
-    return xhat, P, K
+    return xhat, P
     
     
     
