@@ -51,8 +51,8 @@ if __name__ == '__main__':
 	X_axis = np.linspace(0,len(r_x)-1,len(r_x))
 	# ---- Ground truth creation ----
 	start_pt = 0#13000 
-	X_value = 0.365  # [m]
-	Z_value = 0.64 # [m]
+	X_value = 0.0  # [m]
+	Z_value = 0.0 # [m]
 	gnd_X = np.zeros(len(X_axis))
 	gnd_Y = np.zeros(len(X_axis))
 	#gnd_Z = np.zeros(len(X_axis))
